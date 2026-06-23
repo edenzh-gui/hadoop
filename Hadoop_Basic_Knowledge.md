@@ -35,8 +35,31 @@ graph TD
 - **DataNode (DN - 躯干/工作节点)**
   - 真正存储文件 Block 数据。
   - 定期向 NN 发送心跳和自己的块报告，证明自己“还活着”。
-- **Secondary NameNode (2NN - 秘书)**
+- **Secondary NameNode (2NN -秘书)**
   - 并不是 NN 的热备，而是用来辅助 NN 合并元数据日志（FsImage 和 Edits），减轻 NN 启动时的压力。
+
+### 3. 高可用架构 (HA - High Availability) 与 JournalNode
+在企业生产环境中，单台 NameNode 存在**单点故障风险**（如果 NN 宕机，整个集群将瘫痪）。为了解决这个问题，Hadoop 引入了 HA（高可用）机制。这也就是你提到的 **JournalNode** 大显身手的地方。
+
+**HA 架构下的核心变化：**
+- **取消 SecondaryNameNode**：HA 架构下不再需要 2NN，元数据合并工作直接由 Standby NameNode 完成。
+- **双 NameNode 机制**：集群中会有两台 NameNode，一台是 **Active**（活跃状态，对外提供服务），另一台是 **Standby**（待命热备状态，时刻同步数据）。
+- **JournalNode (JN - 日志节点)**：
+  - **核心作用**：它是连接 Active NN 和 Standby NN 的数据共享桥梁。
+  - **原理机制**：Active NN 会把每一次的元数据变更日志（Edits）写入到一组 JournalNode 集群中；Standby NN 则时刻盯着 JournalNode，一旦有新日志，立刻读取并在自己内存中重放。这样就保证了 Active 和 Standby 的数据时刻保持一致。
+  - **部署特性**：JournalNode 通常部署为奇数个（如 3、5 个），只要有一半以上的节点存活，日志系统就能正常工作。
+- **ZooKeeper (ZK) 与 ZKFC**：ZooKeeper 负责监控这两台 NN。如果 Active NN 突然宕机，ZooKeeper 会迅速反应，自动将 Standby NN 提升为新的 Active NN，实现无缝切换（自动故障转移）。
+
+```mermaid
+graph TD
+    Client[Client / 客户端] -->|读写请求| ActiveNN(Active NameNode: 提供服务)
+    ActiveNN -->|1. 写入变更日志| JN((JournalNodes 集群))
+    StandbyNN(Standby NameNode: 随时待命) -->|2. 实时同步日志| JN
+    ZK(ZooKeeper 集群) -.->|3. 监控心跳与自动选举切换| ActiveNN
+    ZK -.->|3. 监控心跳与自动选举切换| StandbyNN
+    ActiveNN -->|管理| DN(DataNodes)
+    StandbyNN -.->|接收块报告| DN
+```
 
 ---
 
