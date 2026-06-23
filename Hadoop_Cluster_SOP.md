@@ -1,244 +1,277 @@
-# Hadoop 完全分布式集群部署 SOP (3节点)
+# Hadoop & Spark 高可用 (HA) 集群部署 SOP (5节点)
 
-## 一、 集群规划建议
-你有 9 台机器 (192.168.9.51 - 59)。对于基础学习和中小型项目，建议采用 **3 台服务器** 搭建一套标准的**完全分布式集群**。
-这不仅能完全体现出分布式的特性，也能节省资源。
+## 一、 集群架构与节点规划
+你有 9 台机器，这里我们选取 **5 台** (192.168.9.51 - 192.168.9.55) 来搭建一个标准的**企业级高可用 (HA)** 集群。
+引入了 **ZooKeeper** 和 **JournalNode** 来保证单点不宕机，并使用 **Spark on YARN** 替代传统的 MapReduce。
 
 **节点角色分配规划：**
-- **master (192.168.9.51)**：主节点，部署 `NameNode` (HDFS 主)、`ResourceManager` (YARN 主)、`SecondaryNameNode`。
-- **worker1 (192.168.9.52)**：从节点，部署 `DataNode`、`NodeManager`。
-- **worker2 (192.168.9.53)**：从节点，部署 `DataNode`、`NodeManager`。
 
 ```mermaid
 graph TD
-    subgraph Master [192.168.9.51 - master]
-        NN[NameNode<br/>HDFS 大脑]
-        SNN[SecondaryNameNode<br/>HDFS 秘书]
-        RM[ResourceManager<br/>YARN 总管]
-        JHS[JobHistoryServer<br/>历史日志]
+    subgraph Master 节点组
+        M1[192.168.9.51 - master1<br/>Active NN, Active RM<br/>ZK, JN, Spark Client]
+        M2[192.168.9.52 - master2<br/>Standby NN, Standby RM<br/>ZK, JN]
     end
 
-    subgraph Worker1 [192.168.9.52 - worker1]
-        DN1[DataNode<br/>HDFS 数据]
-        NM1[NodeManager<br/>YARN 节点管家]
+    subgraph Worker 节点组
+        W1[192.168.9.53 - worker1<br/>DataNode, NodeManager<br/>ZK, JN]
+        W2[192.168.9.54 - worker2<br/>DataNode, NodeManager]
+        W3[192.168.9.55 - worker3<br/>DataNode, NodeManager]
     end
 
-    subgraph Worker2 [192.168.9.53 - worker2]
-        DN2[DataNode<br/>HDFS 数据]
-        NM2[NodeManager<br/>YARN 节点管家]
-    end
-
-    Master <--> Worker1
-    Master <--> Worker2
-    Worker1 <--> Worker2
+    M1 <--> M2
+    M1 <--> W1
+    M2 <--> W1
 ```
 
 ---
 
-## 二、 部署前置准备 (三台机器都要执行)
+## 二、 部署前置准备 (所有节点都要执行)
 
-> 建议使用 `root` 用户执行以下操作，或者拥有免密 sudo 权限的用户。
+> 建议使用 `root` 用户执行。
 
-### 1. 修改主机名 (Hostname) 并配置 Hosts
-在 `192.168.9.51` 执行：`hostnamectl set-hostname master`
-在 `192.168.9.52` 执行：`hostnamectl set-hostname worker1`
-在 `192.168.9.53` 执行：`hostnamectl set-hostname worker2`
+### 1. 修改主机名并配置 Hosts
+在每台机器上分别执行 `hostnamectl set-hostname master1`、`master2`、`worker1`、`worker2`、`worker3`。
 
-在三台机器的 `/etc/hosts` 文件中都追加以下内容：
+在所有机器的 `/etc/hosts` 中追加：
 ```text
-192.168.9.51 master
-192.168.9.52 worker1
-192.168.9.53 worker2
+192.168.9.51 master1
+192.168.9.52 master2
+192.168.9.53 worker1
+192.168.9.54 worker2
+192.168.9.55 worker3
 ```
 
 ### 2. 关闭防火墙和 SELinux
 ```bash
-# 关闭防火墙
-systemctl stop firewalld
-systemctl disable firewalld
-
-# 关闭 SELinux
+systemctl stop firewalld && systemctl disable firewalld
 setenforce 0
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
 ```
 
 ### 3. 配置免密 SSH 登录
-让 master 节点能够无密码登录到自己和两台 worker 节点（Hadoop 启停脚本依赖此功能）。
-**在 master 节点 (9.51) 上执行：**
+由于有两个 Master 需要随时互相连接与接管集群，需要配置两台 Master 对所有节点的免密登录。
+**在 master1 和 master2 上分别执行：**
 ```bash
-# 生成密钥（一直回车即可）
 ssh-keygen -t rsa
-
-# 分发公钥到所有节点（包括自己）
-ssh-copy-id master
+ssh-copy-id master1
+ssh-copy-id master2
 ssh-copy-id worker1
 ssh-copy-id worker2
+ssh-copy-id worker3
 ```
-*测试一下：在 master 节点输入 `ssh worker1`，如果不输入密码能登入即为成功，记得 `exit` 退出返回 master。*
 
 ### 4. 安装 JDK 8/11
-确保三台机器都安装了 JDK。推荐安装到统一下录，比如 `/opt/module/jdk1.8.0`。
-记录下 Java 的安装路径（例如 `/usr/lib/jvm/java-1.8.0-openjdk` 或你解压的绝对路径），后续需要配置 `JAVA_HOME`。
+确保所有机器在统一下录下安装了 JDK（例如 `/opt/module/jdk1.8.0`），记录好 Java 绝对路径。
 
 ---
 
-## 三、 安装与配置 Hadoop (先在 master 节点执行)
+## 三、 安装与配置 ZooKeeper (HA 的基础)
+
+在 `master1`, `master2`, `worker1` 部署 ZK 集群。
 
 ### 1. 下载解压
 ```bash
-# 建议建立专门的目录，例如 /opt/module/
 mkdir -p /opt/module
-cd /opt/module
-
-# 下载 hadoop 3.x
-wget https://dlcdn.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
-tar -zxvf hadoop-3.3.6.tar.gz
-cd hadoop-3.3.6
+wget https://archive.apache.org/dist/zookeeper/zookeeper-3.7.2/apache-zookeeper-3.7.2-bin.tar.gz
+tar -zxvf apache-zookeeper-3.7.2-bin.tar.gz -C /opt/module/
 ```
 
-### 2. 配置环境变量
-在 `~/.bashrc` 或 `/etc/profile` 中添加：
+### 2. 配置文件
+进入 ZK 目录，复制配置模板：
 ```bash
-export HADOOP_HOME=/opt/module/hadoop-3.3.6
-export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+cd /opt/module/apache-zookeeper-3.7.2-bin
+cp conf/zoo_sample.cfg conf/zoo.cfg
 ```
-执行 `source ~/.bashrc` 使其生效。
+修改 `conf/zoo.cfg`：
+```properties
+dataDir=/opt/module/apache-zookeeper-3.7.2-bin/zkData
+server.1=master1:2888:3888
+server.2=master2:2888:3888
+server.3=worker1:2888:3888
+```
 
-### 3. 修改核心配置文件 (位于 etc/hadoop/ 目录下)
+### 3. 创建 myid 文件
+在 `master1`, `master2`, `worker1` 上分别执行创建目录：
+```bash
+mkdir -p /opt/module/apache-zookeeper-3.7.2-bin/zkData
+```
+然后分别给每个节点打上身份烙印：
+- **master1** 执行: `echo "1" > /opt/module/apache-zookeeper-3.7.2-bin/zkData/myid`
+- **master2** 执行: `echo "2" > /opt/module/apache-zookeeper-3.7.2-bin/zkData/myid`
+- **worker1** 执行: `echo "3" > /opt/module/apache-zookeeper-3.7.2-bin/zkData/myid`
 
-**① 修改 `hadoop-env.sh`**
-找到 `export JAVA_HOME`，将其修改为你的实际 Java 路径：
+### 4. 启动 ZK 集群
+在三台 ZK 机器上分别执行启动：
+```bash
+bin/zkServer.sh start
+```
+
+---
+
+## 四、 安装与配置 Hadoop HA
+
+在 `master1` 上进行下载和配置，最后分发给所有人。
+```bash
+wget https://dlcdn.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+tar -zxvf hadoop-3.3.6.tar.gz -C /opt/module/
+```
+
+### 1. `hadoop-env.sh` (环境变量)
+`etc/hadoop/hadoop-env.sh`:
 ```bash
 export JAVA_HOME=/你的/java/绝对路径
 ```
 
-**② 修改 `core-site.xml`**
+### 2. `core-site.xml`
 ```xml
 <configuration>
-    <!-- 指定 NameNode 的地址 (指向 master 节点) -->
+    <!-- 把默认文件系统指向逻辑名称 mycluster (由 zookeeper 动态解析真正的 Active) -->
     <property>
         <name>fs.defaultFS</name>
-        <value>hdfs://master:8020</value>
+        <value>hdfs://mycluster</value>
     </property>
-    <!-- 指定 Hadoop 临时目录存放位置 -->
     <property>
         <name>hadoop.tmp.dir</name>
         <value>/opt/module/hadoop-3.3.6/data</value>
     </property>
+    <!-- 指定 ZK 地址 -->
+    <property>
+        <name>ha.zookeeper.quorum</name>
+        <value>master1:2181,master2:2181,worker1:2181</value>
+    </property>
 </configuration>
 ```
 
-**③ 修改 `hdfs-site.xml`**
+### 3. `hdfs-site.xml` (配置 NN 高可用)
 ```xml
 <configuration>
-    <!-- 副本数量，因为只有2个 worker 节点，副本数设为 2 即可 -->
+    <!-- 数据副本 -->
+    <property><name>dfs.replication</name><value>3</value></property>
+    
+    <!-- 逻辑集群名及底下的两个 NameNode 别名 -->
+    <property><name>dfs.nameservices</name><value>mycluster</value></property>
+    <property><name>dfs.ha.namenodes.mycluster</name><value>nn1,nn2</value></property>
+    
+    <!-- 两个 NN 的实际机器地址 -->
+    <property><name>dfs.namenode.rpc-address.mycluster.nn1</name><value>master1:8020</value></property>
+    <property><name>dfs.namenode.rpc-address.mycluster.nn2</name><value>master2:8020</value></property>
+    <property><name>dfs.namenode.http-address.mycluster.nn1</name><value>master1:9870</value></property>
+    <property><name>dfs.namenode.http-address.mycluster.nn2</name><value>master2:9870</value></property>
+
+    <!-- 指定 JournalNode 集群地址，用于同步 EditLog -->
     <property>
-        <name>dfs.replication</name>
-        <value>2</value>
+        <name>dfs.namenode.shared.edits.dir</name>
+        <value>qjournal://master1:8485;master2:8485;worker1:8485/mycluster</value>
     </property>
-    <!-- 指定 SecondaryNameNode 的地址 -->
+
+    <!-- 开启自动故障转移及免密代理配置 -->
     <property>
-        <name>dfs.namenode.secondary.http-address</name>
-        <value>master:9868</value>
+        <name>dfs.client.failover.proxy.provider.mycluster</name>
+        <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
     </property>
+    <property><name>dfs.ha.fencing.methods</name><value>sshfence</value></property>
+    <property><name>dfs.ha.fencing.ssh.private-key-files</name><value>/root/.ssh/id_rsa</value></property>
+    <property><name>dfs.ha.automatic-failover.enabled</name><value>true</value></property>
 </configuration>
 ```
 
-**④ 修改 `yarn-site.xml`**
+### 4. `yarn-site.xml` (配置 RM 高可用)
 ```xml
 <configuration>
-    <!-- 指定 RM 的地址 -->
+    <property><name>yarn.nodemanager.aux-services</name><value>mapreduce_shuffle</value></property>
+    
+    <!-- 开启 RM HA -->
+    <property><name>yarn.resourcemanager.ha.enabled</name><value>true</value></property>
+    <property><name>yarn.resourcemanager.cluster-id</name><value>yarn-cluster</value></property>
+    <property><name>yarn.resourcemanager.ha.rm-ids</name><value>rm1,rm2</value></property>
+    <property><name>yarn.resourcemanager.hostname.rm1</name><value>master1</value></property>
+    <property><name>yarn.resourcemanager.hostname.rm2</name><value>master2</value></property>
+
+    <!-- 指定 ZK 地址供 RM 选主 -->
     <property>
-        <name>yarn.resourcemanager.hostname</name>
-        <value>master</value>
-    </property>
-    <!-- NodeManager 上运行的附属服务，配置成 mapreduce_shuffle -->
-    <property>
-        <name>yarn.nodemanager.aux-services</name>
-        <value>mapreduce_shuffle</value>
-    </property>
-    <!-- 开启日志聚集功能，方便在页面查看任务日志 -->
-    <property>
-        <name>yarn.log-aggregation-enable</name>
-        <value>true</value>
-    </property>
-    <property>
-        <name>yarn.log.server.url</name>
-        <value>http://master:19888/jobhistory/logs</value>
+        <name>yarn.resourcemanager.zk-address</name>
+        <value>master1:2181,master2:2181,worker1:2181</value>
     </property>
 </configuration>
 ```
 
-**⑤ 修改 `mapred-site.xml`**
-```xml
-<configuration>
-    <!-- 指定 MapReduce 程序运行在 Yarn 上 -->
-    <property>
-        <name>mapreduce.framework.name</name>
-        <value>yarn</value>
-    </property>
-    <!-- 历史服务器端地址 -->
-    <property>
-        <name>mapreduce.jobhistory.address</name>
-        <value>master:10020</value>
-    </property>
-    <property>
-        <name>mapreduce.jobhistory.webapp.address</name>
-        <value>master:19888</value>
-    </property>
-</configuration>
-```
-
-**⑥ 修改 `workers` 文件** (Hadoop 2.x 中叫 `slaves`)
-里面填写你所有 DataNode 的主机名。删除里面的 `localhost`，添加：
+### 5. `workers` 文件
 ```text
 worker1
 worker2
+worker3
 ```
+
+**将配置好的 Hadoop 整个目录，用 `scp` 分发到 `master2`, `worker1`, `worker2`, `worker3` 的对应目录中。**
 
 ---
 
-## 四、 分发 Hadoop 目录到其他节点
-在 master 节点执行，把配置好的 Hadoop 目录和环境变量文件拷贝给 worker：
-```bash
-scp -r /opt/module/hadoop-3.3.6 root@worker1:/opt/module/
-scp -r /opt/module/hadoop-3.3.6 root@worker2:/opt/module/
-```
-*(提示：别忘了在 worker1 和 worker2 上也配置一下环境变量)*
+## 五、 Hadoop HA 首次启动与初始化 (极度重要)
+
+> 这套步骤仅在**第一次搭建初始化**时使用，以后开机重启集群直接执行 `start-all.sh` 即可。
+
+1. **启动 JournalNode 集群** (在 master1、master2、worker1 分别执行)：
+   ```bash
+   hdfs --daemon start journalnode
+   ```
+2. **格式化第一台 NameNode** (在 master1 执行)：
+   ```bash
+   hdfs namenode -format
+   ```
+3. **启动第一台 NameNode** (在 master1 执行)：
+   ```bash
+   hdfs --daemon start namenode
+   ```
+4. **同步 Standby 元数据** (去 master2 执行)：
+   ```bash
+   hdfs namenode -bootstrapStandby
+   ```
+5. **格式化 ZooKeeper 初始化 HA 状态节点** (回 master1 执行)：
+   ```bash
+   hdfs zkfc -formatZK
+   ```
+6. **一键启动所有剩余服务** (在 master1 执行)：
+   ```bash
+   start-dfs.sh
+   start-yarn.sh
+   ```
+
+**验证：**访问浏览器 `http://master1:9870` 和 `http://master2:9870`，你会发现一个是 **Active**，一个是 **Standby**，并且任意杀掉 Active 的进程，另一个会瞬间自动接管！
 
 ---
 
-## 五、 初始化与启动集群
+## 六、 部署 Spark on YARN (现代计算引擎)
 
-### 1. 格式化 NameNode (仅第一次需要！)
-在 **master 节点** 执行：
+企业级大数据计算标准，将 Spark 的资源请求托管给集群的 YARN 大管家。
+
+### 1. 下载解压 Spark
+在 `master1`（作为任务提交客户端）执行：
 ```bash
-hdfs namenode -format
-```
-*如果输出中没有 ERROR 且看到 `successfully formatted` 则说明成功。*
-
-### 2. 启动 HDFS 和 YARN
-在 **master 节点** 执行：
-```bash
-# 启动 HDFS (会自动去 worker 节点拉起 DataNode)
-start-dfs.sh
-
-# 启动 YARN (会自动去 worker 节点拉起 NodeManager)
-start-yarn.sh
-
-# 启动历史服务器 (方便看任务日志)
-mapred --daemon start historyserver
+cd /opt/module
+wget https://dlcdn.apache.org/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz
+tar -zxvf spark-3.5.1-bin-hadoop3.tgz
 ```
 
-### 3. 验证集群状态
-在 **master** 上输入 `jps`，应该看到：
-`NameNode`, `ResourceManager`, `SecondaryNameNode`, `JobHistoryServer`。
+### 2. 配置环境链接
+确保 `master1` 知道 Hadoop 配置在哪（编辑 `~/.bashrc`）：
+```bash
+export HADOOP_CONF_DIR=/opt/module/hadoop-3.3.6/etc/hadoop
+export PATH=$PATH:/opt/module/spark-3.5.1-bin-hadoop3/bin
+```
+执行 `source ~/.bashrc`。
 
-在 **worker1/worker2** 上输入 `jps`，应该看到：
-`DataNode`, `NodeManager`。
-
-### 4. 访问 Web 监控页面 (在你本机的浏览器中)
-- **HDFS 控制台**: `http://192.168.9.51:9870`
-- **YARN 资源管理页面**: `http://192.168.9.51:8088`
-
-**恭喜，你的完全分布式 Hadoop 集群部署完成了！**
+### 3. 提交一个测试任务到集群
+测试计算圆周率 Pi：
+```bash
+spark-submit \
+  --class org.apache.spark.examples.SparkPi \
+  --master yarn \
+  --deploy-mode cluster \
+  --driver-memory 1g \
+  --executor-memory 1g \
+  --executor-cores 1 \
+  /opt/module/spark-3.5.1-bin-hadoop3/examples/jars/spark-examples_*.jar \
+  10
+```
+如果你能在终端（或者通过 `yarn application -list` 命令，或者 YARN 面板 8088）看到 Spark 任务成功跑完并打出 Pi 值，恭喜你，你的企业级大数据底层基座已经彻底搭建完毕！

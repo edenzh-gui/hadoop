@@ -92,25 +92,39 @@ graph TD
 
 ---
 
-## 四、 核心组件 3：MapReduce (分布式计算框架)
-MapReduce 是基于 YARN 运行的数据处理引擎，核心思想是**“分而治之”**。
+## 四、 核心组件 3：从 MapReduce 到 Spark (计算引擎演进)
 
-- **Map 阶段**：将复杂的、庞大的数据拆分成许多小块数据，由多台机器并行处理（映射）。
-- **Shuffle 阶段**：连接 Map 和 Reduce 的桥梁，负责数据的分区、排序、分组和网络传输。这是最耗时的一步。
-- **Reduce 阶段**：将 Map 阶段输出的中间结果进行汇总、统计，得出最终结论（归约）。
+### 1. 传统的 MapReduce
+MapReduce 是 Hadoop 早期绑定的计算引擎，核心思想是**“分而治之”**。
+- **Map 阶段**：将复杂庞大的数据拆分，由多台机器并行处理。
+- **Reduce 阶段**：将 Map 的中间结果汇总得出最终结论。
+> *局限性：每次 Map 或 Reduce 处理完，中间数据都必须写回磁盘。频繁的磁盘 I/O 导致它极其缓慢，目前在实际企业开发中已被大量淘汰。*
 
-> *说明：由于 MapReduce 每次计算都要频繁读写磁盘，速度较慢。目前在实际企业中，大部分计算任务已被 Spark/Flink 替代，但 MapReduce 依然是理解大数据底层原理的最佳入口。*
+### 2. 新一代王者：Spark
+为了解决 MapReduce 的速度瓶颈，**Spark** 横空出世，目前已是企业级批处理计算的绝对主流。
+- **核心优势（内存计算）**：Spark 引入了 RDD（弹性分布式数据集）的概念，将中间结果尽量缓存在**内存**中。它的速度通常比 MapReduce 快 10 到 100 倍！
+- **与 Hadoop 的绝佳搭配 (Spark on YARN)**：Spark 本身只是一个“计算引擎”，虽然自带调度器，但在企业里标准做法是将它挂载在 Hadoop 之上，各司其职：
+  - **存储底座 ➡ HDFS**
+  - **资源管家 ➡ YARN**
+  - **运算大脑 ➡ Spark**
+
+```mermaid
+graph TD
+    User(开发者提交任务) -->|spark-submit| RM(YARN ResourceManager)
+    RM -->|分配容器| NM(Worker节点 NodeManager)
+    NM -->|启动执行器| Executor(Spark Executor: 内存计算)
+    Executor <-->|读取/保存数据| HDFS(HDFS 底层存储)
+```
 
 ---
 
 ## 五、 Hadoop 扩展生态图谱
-除了核心三大件，Hadoop 还有一个庞大的生态支撑实际业务：
+除了上述核心架构，Hadoop 还有庞大的生态支撑实际业务：
 
-1. **Hive (数据仓库)**：将 SQL 语句转化为 MapReduce/Spark 任务。不会写 Java 也能做大数据分析，离线数仓必备！
-2. **Spark / Flink (计算引擎)**：新一代计算引擎。Spark 基于内存计算，适合批处理和机器学习；Flink 适合实时流式数据计算。
+1. **Hive (数据仓库)**：将 SQL 语句自动翻译为 MapReduce/Spark 任务。不会写 Java 也能做大数据分析，离线数仓建设必备！
+2. **Flink (实时计算引擎)**：如果说 Spark 是批处理（离线计算）的王者，那么 Flink 就是流处理（实时计算）的霸主，适用于双十一实时大屏、风控拦截等。
 3. **HBase (NoSQL 数据库)**：建立在 HDFS 上的列式数据库，支持对 PB 级数据的毫秒级随机读写。
-4. **ZooKeeper (分布式协调服务)**：集群的“调度中心”，负责解决分布式系统中的一致性问题（如高可用 HA 选举）。
-5. **Flume / Sqoop / Kafka (数据通道)**：
+4. **Flume / Sqoop / Kafka (数据通道)**：
    - Flume：采集服务器实时日志数据。
    - Sqoop：在 Hadoop 和关系型数据库（如 MySQL）之间倒腾数据。
    - Kafka：高性能的消息队列，用于缓冲海量数据，削峰填谷。
