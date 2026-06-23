@@ -9,6 +9,30 @@
 - **worker1 (192.168.9.52)**：从节点，部署 `DataNode`、`NodeManager`。
 - **worker2 (192.168.9.53)**：从节点，部署 `DataNode`、`NodeManager`。
 
+```mermaid
+graph TD
+    subgraph Master [192.168.9.51 - master]
+        NN[NameNode<br/>HDFS 大脑]
+        SNN[SecondaryNameNode<br/>HDFS 秘书]
+        RM[ResourceManager<br/>YARN 总管]
+        JHS[JobHistoryServer<br/>历史日志]
+    end
+
+    subgraph Worker1 [192.168.9.52 - worker1]
+        DN1[DataNode<br/>HDFS 数据]
+        NM1[NodeManager<br/>YARN 节点管家]
+    end
+
+    subgraph Worker2 [192.168.9.53 - worker2]
+        DN2[DataNode<br/>HDFS 数据]
+        NM2[NodeManager<br/>YARN 节点管家]
+    end
+
+    Master <--> Worker1
+    Master <--> Worker2
+    Worker1 <--> Worker2
+```
+
 ---
 
 ## 二、 部署前置准备 (三台机器都要执行)
