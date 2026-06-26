@@ -310,15 +310,15 @@ scp /etc/profile root@spark06:/etc/
 在需要提交任务的客户端节点（例如 `spark04`）执行：
 ```bash
 cd /opt/module
-wget https://downloads01-he-fi.apache.org/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz
-tar -zxvf spark-3.5.1-bin-hadoop3.tgz
+wget https://downloads01-he-fi.apache.org/spark/spark-3.5.8/spark-3.5.8-bin-hadoop3.tgz
+tar -zxvf spark-3.5.8-bin-hadoop3.tgz
 ```
 
 ### 2. 配置环境链接
 确保知道 Hadoop 配置在哪（编辑 `~/.bashrc`）：
 ```bash
 export HADOOP_CONF_DIR=/opt/module/hadoop-3.3.6/etc/hadoop
-export PATH=$PATH:/opt/module/spark-3.5.1-bin-hadoop3/bin
+export PATH=$PATH:/opt/module/spark-3.5.8-bin-hadoop3/bin
 ```
 执行 `source ~/.bashrc`。
 
@@ -332,7 +332,7 @@ spark-submit \
   --driver-memory 1g \
   --executor-memory 1g \
   --executor-cores 1 \
-  /opt/module/spark-3.5.1-bin-hadoop3/examples/jars/spark-examples_*.jar \
+  /opt/module/spark-3.5.8-bin-hadoop3/examples/jars/spark-examples_*.jar \
   10
 ```
 如果你能在终端（或者通过 `yarn application -list` 命令，或者 YARN 面板 `http://spark01:8088` 或 `http://spark03:8088`）看到 Spark 任务成功跑完并打出 Pi 值，恭喜你，你的企业级大数据底层基座已经彻底搭建完毕！

@@ -175,7 +175,7 @@ pyspark --master yarn
 ### 3. 查看历史任务页面 (History Server - 选配)
 如果你的 Spark 任务跑完就消失了，你想看已经跑完任务的耗时和执行图，需要启动 History Server（需要在 `spark-defaults.conf` 中配置日志存放路径）：
 ```bash
-/opt/module/spark-3.5.1-bin-hadoop3/sbin/start-history-server.sh
+/opt/module/spark-3.5.8-bin-hadoop3/sbin/start-history-server.sh
 ```
 启动后可以访问 `http://spark01:18080` 进行查看。
 
