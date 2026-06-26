@@ -128,7 +128,7 @@ bin/zkServer.sh start
 
 在 `spark01` 上进行下载和配置，最后分发给所有人。
 ```bash
-wget https://dlcdn.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+wget https://archive.apache.org/dist/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
 tar -zxvf hadoop-3.3.6.tar.gz -C /opt/module/
 ```
 
@@ -264,7 +264,7 @@ spark06
 在需要提交任务的客户端节点（例如 `spark04`）执行：
 ```bash
 cd /opt/module
-wget https://dlcdn.apache.org/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz
+wget https://archive.apache.org/dist/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz
 tar -zxvf spark-3.5.1-bin-hadoop3.tgz
 ```
 
