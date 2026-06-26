@@ -1,0 +1,37 @@
+---
+- name: Set hostname based on inventory
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Clean up 127.0.1.1 loopback binding from /etc/hosts (Ubuntu Pitfall)
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1'
+    state: absent
+
+- name: Add cluster hosts mappings to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item].ansible_host }} {{ item }}"
+    state: present
+  loop: "{{ groups['all'] }}"
+
+- name: Disable UFW firewall
+  ufw:
+    state: disabled
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install OpenJDK 8
+  apt:
+    name: openjdk-8-jdk
+    state: present
+
+- name: Create unified install directory
+  file:
+    path: "{{ install_base_dir }}"
+    state: directory
+    mode: '0777'

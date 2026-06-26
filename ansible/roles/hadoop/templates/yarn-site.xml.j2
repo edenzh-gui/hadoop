@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+    <property><name>yarn.nodemanager.aux-services</name><value>mapreduce_shuffle</value></property>
+    
+    <property><name>yarn.resourcemanager.ha.enabled</name><value>true</value></property>
+    <property><name>yarn.resourcemanager.cluster-id</name><value>{{ yarn_cluster_name }}</value></property>
+    <property>
+        <name>yarn.resourcemanager.ha.rm-ids</name>
+        <value>{% for host in groups['resourcemanagers'] %}{{ hostvars[host].rm_id }}{% if not loop.last %},{% endif %}{% endfor %}</value>
+    </property>
+    
+    {% for host in groups['resourcemanagers'] %}
+    <property><name>yarn.resourcemanager.hostname.{{ hostvars[host].rm_id }}</name><value>{{ host }}</value></property>
+    {% endfor %}
+
+    <property>
+        <name>yarn.resourcemanager.zk-address</name>
+        <value>{% for host in groups['zookeepers'] %}{{ host }}:2181{% if not loop.last %},{% endif %}{% endfor %}</value>
+    </property>
+</configuration>

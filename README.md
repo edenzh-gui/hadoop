@@ -17,10 +17,13 @@
    - 核心组件安装与配置
    - 集群分发与初始化
    - 启动与 Web UI 验证
-
 3. [Hadoop + Spark + ZooKeeper 常见命令维护手册](Cluster_Maintenance_Commands.md)
    - ZK 启停与状态查看
    - HDFS 文件操作与 HA 高可用管理
    - YARN 任务管理与启停
    - Spark 任务提交与交互式开发
    - 终极日志排错路径指南
+
+4. **[自动化部署进阶版]** [Ansible Playbook 自动装配工程](ansible/)
+   - 基于 Ansible 的 6 节点全自动铺设方案
+   - [自动化铺设后的首次强顺序手动初始化步骤](Manual_Initialization_Steps.md)

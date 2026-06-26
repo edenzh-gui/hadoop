@@ -1,0 +1,21 @@
+---
+- name: Download Spark package
+  get_url:
+    url: "{{ spark_download_url }}"
+    dest: "/tmp/spark-{{ spark_version }}-bin-hadoop3.tgz"
+
+- name: Extract Spark
+  unarchive:
+    src: "/tmp/spark-{{ spark_version }}-bin-hadoop3.tgz"
+    dest: "{{ install_base_dir }}"
+    remote_src: yes
+    creates: "{{ spark_home }}/bin/spark-submit"
+
+- name: Inject Spark environment variables into /etc/profile
+  blockinfile:
+    path: /etc/profile
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - SPARK ENV"
+    block: |
+      export SPARK_HOME={{ spark_home }}
+      export HADOOP_CONF_DIR={{ hadoop_home }}/etc/hadoop
+      export PATH=$PATH:$SPARK_HOME/bin

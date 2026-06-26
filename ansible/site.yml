@@ -1,0 +1,24 @@
+---
+- name: Apply Common Environment to All Nodes
+  hosts: all
+  become: yes
+  roles:
+    - common
+
+- name: Deploy ZooKeeper Cluster
+  hosts: zookeepers
+  become: yes
+  roles:
+    - zookeeper
+
+- name: Deploy Hadoop HA Cluster
+  hosts: all
+  become: yes
+  roles:
+    - hadoop
+
+- name: Deploy Spark Clients
+  hosts: spark_clients
+  become: yes
+  roles:
+    - spark

@@ -1,0 +1,46 @@
+---
+- name: Download Hadoop package
+  get_url:
+    url: "{{ hadoop_download_url }}"
+    dest: "/tmp/hadoop-{{ hadoop_version }}.tar.gz"
+
+- name: Extract Hadoop
+  unarchive:
+    src: "/tmp/hadoop-{{ hadoop_version }}.tar.gz"
+    dest: "{{ install_base_dir }}"
+    remote_src: yes
+    creates: "{{ hadoop_home }}/bin/hadoop"
+
+- name: Configure hadoop-env.sh
+  template:
+    src: hadoop-env.sh.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/hadoop-env.sh"
+    mode: '0755'
+
+- name: Configure core-site.xml
+  template:
+    src: core-site.xml.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/core-site.xml"
+
+- name: Configure hdfs-site.xml
+  template:
+    src: hdfs-site.xml.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/hdfs-site.xml"
+
+- name: Configure yarn-site.xml
+  template:
+    src: yarn-site.xml.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/yarn-site.xml"
+
+- name: Configure workers
+  template:
+    src: workers.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/workers"
+
+- name: Inject Hadoop environment variables into /etc/profile
+  blockinfile:
+    path: /etc/profile
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - HADOOP ENV"
+    block: |
+      export HADOOP_HOME={{ hadoop_home }}
+      export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
