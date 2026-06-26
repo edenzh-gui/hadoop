@@ -44,11 +44,10 @@ graph TD
 192.158.9.46 spark06
 ```
 
-### 2. 关闭防火墙和 SELinux
+### 2. 关闭防火墙
+Ubuntu 系统默认使用 `ufw`，需要将其关闭（注意：Ubuntu 默认没有预装 SELinux，无需配置 SELinux）：
 ```bash
-systemctl stop firewalld && systemctl disable firewalld
-setenforce 0
-sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+ufw disable
 ```
 
 ### 3. 配置免密 SSH 登录
