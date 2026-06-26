@@ -11,8 +11,8 @@
    - MapReduce (计算框架)
    - 常见周边生态 (Hive, Spark, HBase, Zookeeper 等)
 
-2. [Hadoop 完全分布式集群部署 SOP (3节点)](Hadoop_Cluster_SOP.md)
-   - 集群节点规划 (1 Master, 2 Workers)
+2. [Hadoop 完全分布式集群部署 SOP (6节点)](Hadoop_Cluster_SOP.md)
+   - 集群节点规划 (3 Master, 3 Workers)
    - 部署前置准备 (免密登录、防火墙、JDK 配置)
    - 核心组件安装与配置
    - 集群分发与初始化
