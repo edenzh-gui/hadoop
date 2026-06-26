@@ -1,7 +1,7 @@
 # Hadoop & Spark 高可用 (HA) 集群部署 SOP (6节点)
 
 ## 一、 集群架构与节点规划
-这里我们选取 **6 台** (192.158.9.41 - 192.158.9.46) 来搭建一个标准的**企业级高可用 (HA)** 集群。
+这里我们选取 **6 台** (192.168.9.41 - 192.168.9.46) 来搭建一个标准的**企业级高可用 (HA)** 集群。
 引入了 **ZooKeeper** 和 **JournalNode** 来保证单点不宕机，并使用 **Spark on YARN** 替代传统的 MapReduce。
 
 **节点角色分配规划：**
@@ -9,15 +9,15 @@
 ```mermaid
 graph TD
     subgraph Master 节点组
-        S1[192.158.9.41 - spark01<br/>Active NN, Active RM<br/>ZK]
-        S2[192.158.9.42 - spark02<br/>Standby NN<br/>ZK]
-        S3[192.158.9.43 - spark03<br/>Standby RM<br/>ZK]
+        S1[192.168.9.41 - spark01<br/>Active NN, Active RM<br/>ZK]
+        S2[192.168.9.42 - spark02<br/>Standby NN<br/>ZK]
+        S3[192.168.9.43 - spark03<br/>Standby RM<br/>ZK]
     end
 
     subgraph Worker 节点组
-        S4[192.158.9.44 - spark04<br/>JournalNode, DataNode, NodeManager, Spark]
-        S5[192.158.9.45 - spark05<br/>JournalNode, DataNode, NodeManager, Spark]
-        S6[192.158.9.46 - spark06<br/>JournalNode, DataNode, NodeManager, Spark]
+        S4[192.168.9.44 - spark04<br/>JournalNode, DataNode, NodeManager, Spark]
+        S5[192.168.9.45 - spark05<br/>JournalNode, DataNode, NodeManager, Spark]
+        S6[192.168.9.46 - spark06<br/>JournalNode, DataNode, NodeManager, Spark]
     end
 
     S1 <--> S2
@@ -34,14 +34,16 @@ graph TD
 ### 1. 修改主机名并配置 Hosts
 在每台机器上分别执行 `hostnamectl set-hostname spark01` 到 `spark06`。
 
-在所有机器的 `/etc/hosts` 中追加：
-```text
-192.158.9.41 spark01
-192.158.9.42 spark02
-192.158.9.43 spark03
-192.158.9.44 spark04
-192.158.9.45 spark05
-192.158.9.46 spark06
+在所有机器上直接复制粘贴执行以下命令，将映射追加到 `/etc/hosts` 中：
+```bash
+cat << 'EOF' >> /etc/hosts
+192.168.9.41 spark01
+192.168.9.42 spark02
+192.168.9.43 spark03
+192.168.9.44 spark04
+192.168.9.45 spark05
+192.168.9.46 spark06
+EOF
 ```
 
 ### 2. 关闭防火墙
