@@ -79,6 +79,12 @@ sudo apt install openjdk-8-jdk -y
 ```
 安装完成后，可以通过 `java -version` 验证。Ubuntu 通过 apt 安装的 OpenJDK 8，其默认绝对路径为 `/usr/lib/jvm/java-8-openjdk-amd64`。
 
+### 5. 创建统一的工作目录
+为了规范化管理，请在**所有 6 台机器上**执行以下命令，提前创建好我们要用的组件安装目录：
+```bash
+mkdir -p /opt/module
+```
+
 ---
 
 ## 三、 安装与配置 ZooKeeper (HA 的基础)
@@ -87,9 +93,9 @@ sudo apt install openjdk-8-jdk -y
 
 ### 1. 下载解压
 ```bash
-mkdir -p /opt/module
+cd /opt/module
 wget https://archive.apache.org/dist/zookeeper/zookeeper-3.7.2/apache-zookeeper-3.7.2-bin.tar.gz
-tar -zxvf apache-zookeeper-3.7.2-bin.tar.gz -C /opt/module/
+tar -zxvf apache-zookeeper-3.7.2-bin.tar.gz
 ```
 
 ### 2. 配置文件
@@ -128,7 +134,7 @@ bin/zkServer.sh start
 
 在 `spark01` 上进行下载和配置，最后分发给所有人。
 ```bash
-wget https://archive.apache.org/dist/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
+wget https://downloads01-he-fi.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
 tar -zxvf hadoop-3.3.6.tar.gz -C /opt/module/
 ```
 
@@ -264,7 +270,7 @@ spark06
 在需要提交任务的客户端节点（例如 `spark04`）执行：
 ```bash
 cd /opt/module
-wget https://archive.apache.org/dist/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz
+wget https://downloads01-he-fi.apache.org/spark/spark-3.5.1/spark-3.5.1-bin-hadoop3.tgz
 tar -zxvf spark-3.5.1-bin-hadoop3.tgz
 ```
 
