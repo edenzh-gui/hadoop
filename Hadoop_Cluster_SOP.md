@@ -65,8 +65,13 @@ ssh-copy-id spark05
 ssh-copy-id spark06
 ```
 
-### 4. 安装 JDK 8/11
-确保所有机器在统一下录下安装了 JDK（例如 `/opt/module/jdk1.8.0`），记录好 Java 绝对路径。
+### 4. 安装 JDK 8 (基于 Ubuntu)
+在大数据生态中，JDK 8 是最稳定且兼容性最好的版本。请在**所有 6 台机器上**执行以下命令安装 OpenJDK 8：
+```bash
+sudo apt update
+sudo apt install openjdk-8-jdk -y
+```
+安装完成后，可以通过 `java -version` 验证。Ubuntu 通过 apt 安装的 OpenJDK 8，其默认绝对路径为 `/usr/lib/jvm/java-8-openjdk-amd64`。
 
 ---
 
@@ -124,7 +129,7 @@ tar -zxvf hadoop-3.3.6.tar.gz -C /opt/module/
 ### 1. `hadoop-env.sh` (环境变量)
 `etc/hadoop/hadoop-env.sh`:
 ```bash
-export JAVA_HOME=/你的/java/绝对路径
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 ```
 
 ### 2. `core-site.xml`
