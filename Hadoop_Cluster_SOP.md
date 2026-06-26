@@ -142,9 +142,17 @@ tar -zxvf hadoop-3.3.6.tar.gz
 > **注意**：Hadoop 所有的配置文件都在解压后的 `/opt/module/hadoop-3.3.6/etc/hadoop/` 目录下。接下来的所有修改，都请使用 `vim` 打开对应的文件进行编辑。
 
 ### 1. `hadoop-env.sh` (运行时环境)
-执行 `vim /opt/module/hadoop-3.3.6/etc/hadoop/hadoop-env.sh`，在文件末尾追加或者找到原本被注释的配置，修改为：
+执行 `vim /opt/module/hadoop-3.3.6/etc/hadoop/hadoop-env.sh`，在文件末尾追加或者找到原本被注释的配置，修改为以下内容（Hadoop 3.x 必须显式声明 root 用户权限）：
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+
+export HDFS_NAMENODE_USER=root
+export HDFS_DATANODE_USER=root
+export HDFS_SECONDARYNAMENODE_USER=root
+export HDFS_JOURNALNODE_USER=root
+export HDFS_ZKFC_USER=root
+export YARN_RESOURCEMANAGER_USER=root
+export YARN_NODEMANAGER_USER=root
 ```
 
 ### 2. `core-site.xml`
@@ -288,6 +296,7 @@ scp /etc/profile root@spark06:/etc/
    start-dfs.sh
    start-yarn.sh
    ```
+   > **注意**：如果在执行 `start-dfs.sh` 时看到类似 `namenode is running... Stop it first` 或 `journalnode is running...` 的提示，**请不要慌张，这是完全正常的！**因为我们在第1步和第3步已经手动把它们拉起来了，脚本只是在温馨提示你它们已经在运行了，同时脚本会继续帮你把 DataNode 和 ZKFC 等其他没启动的服务成功拉起来。
 
 **验证：**访问浏览器 `http://spark01:9870` 和 `http://spark02:9870`，你会发现一个是 **Active**，一个是 **Standby**，并且任意杀掉 Active 的进程，另一个会瞬间自动接管！
 
