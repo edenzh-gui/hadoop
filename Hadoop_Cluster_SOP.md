@@ -132,21 +132,24 @@ bin/zkServer.sh start
 
 ## 四、 安装与配置 Hadoop HA
 
-在 `spark01` 上进行下载和配置，最后分发给所有人。
+在 `spark01` 上进行下载和解压。
 ```bash
+cd /opt/module
 wget https://downloads01-he-fi.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6.tar.gz
-tar -zxvf hadoop-3.3.6.tar.gz -C /opt/module/
+tar -zxvf hadoop-3.3.6.tar.gz
 ```
 
-### 1. `hadoop-env.sh` (环境变量)
-`etc/hadoop/hadoop-env.sh`:
+> **注意**：Hadoop 所有的配置文件都在解压后的 `/opt/module/hadoop-3.3.6/etc/hadoop/` 目录下。接下来的所有修改，都请使用 `vim` 打开对应的文件进行编辑。
+
+### 1. `hadoop-env.sh` (运行时环境)
+执行 `vim /opt/module/hadoop-3.3.6/etc/hadoop/hadoop-env.sh`，在文件末尾追加或者找到原本被注释的配置，修改为：
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 ```
 
 ### 2. `core-site.xml`
+执行 `vim /opt/module/hadoop-3.3.6/etc/hadoop/core-site.xml`，将以下内容**原封不动地粘贴到文件原有的 `<configuration>` 和 `</configuration>` 标签之间**：
 ```xml
-<configuration>
     <!-- 把默认文件系统指向逻辑名称 mycluster (由 zookeeper 动态解析真正的 Active) -->
     <property>
         <name>fs.defaultFS</name>
@@ -161,12 +164,11 @@ export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
         <name>ha.zookeeper.quorum</name>
         <value>spark01:2181,spark02:2181,spark03:2181</value>
     </property>
-</configuration>
 ```
 
 ### 3. `hdfs-site.xml` (配置 NN 高可用)
+执行 `vim /opt/module/hadoop-3.3.6/etc/hadoop/hdfs-site.xml`，同样粘贴到 `<configuration>` 内部：
 ```xml
-<configuration>
     <!-- 数据副本 -->
     <property><name>dfs.replication</name><value>3</value></property>
     
@@ -194,12 +196,11 @@ export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     <property><name>dfs.ha.fencing.methods</name><value>sshfence</value></property>
     <property><name>dfs.ha.fencing.ssh.private-key-files</name><value>/root/.ssh/id_rsa</value></property>
     <property><name>dfs.ha.automatic-failover.enabled</name><value>true</value></property>
-</configuration>
 ```
 
 ### 4. `yarn-site.xml` (配置 RM 高可用)
+执行 `vim /opt/module/hadoop-3.3.6/etc/hadoop/yarn-site.xml`，粘贴到 `<configuration>` 内部：
 ```xml
-<configuration>
     <property><name>yarn.nodemanager.aux-services</name><value>mapreduce_shuffle</value></property>
     
     <!-- 开启 RM HA -->
@@ -214,17 +215,47 @@ export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
         <name>yarn.resourcemanager.zk-address</name>
         <value>spark01:2181,spark02:2181,spark03:2181</value>
     </property>
-</configuration>
 ```
 
-### 5. `workers` 文件
+### 5. `workers` 文件 (配置工作节点)
+执行 `vim /opt/module/hadoop-3.3.6/etc/hadoop/workers`，**清空文件里原有的 `localhost`**，写入我们的 3 个 Worker 节点：
 ```text
 spark04
 spark05
 spark06
 ```
 
-**将配置好的 Hadoop 整个目录，用 `scp` 分发到 `spark02` 到 `spark06` 的对应目录中。**
+### 6. 开启全局环境变量
+为了在任何目录下都能敲 `hdfs` 或者 `start-dfs.sh` 命令，我们在 `spark01` 上执行：
+```bash
+cat << 'EOF' >> /etc/profile
+
+# Hadoop Environment
+export HADOOP_HOME=/opt/module/hadoop-3.3.6
+export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+EOF
+source /etc/profile
+```
+
+### 7. 全局分发配置好的 Hadoop
+上面 6 步都是在 `spark01` 上完成的，现在我们用 `scp` 命令把整个配好的 Hadoop 文件夹以及环境变量同步给其他 5 台机器！
+在 `spark01` 上依次执行：
+```bash
+# 分发 Hadoop 本体
+scp -r /opt/module/hadoop-3.3.6 root@spark02:/opt/module/
+scp -r /opt/module/hadoop-3.3.6 root@spark03:/opt/module/
+scp -r /opt/module/hadoop-3.3.6 root@spark04:/opt/module/
+scp -r /opt/module/hadoop-3.3.6 root@spark05:/opt/module/
+scp -r /opt/module/hadoop-3.3.6 root@spark06:/opt/module/
+
+# 同步环境变量
+scp /etc/profile root@spark02:/etc/
+scp /etc/profile root@spark03:/etc/
+scp /etc/profile root@spark04:/etc/
+scp /etc/profile root@spark05:/etc/
+scp /etc/profile root@spark06:/etc/
+```
+> 分发完成后，建议去另外 5 台机器上也执行一下 `source /etc/profile` 让环境变量生效。
 
 ---
 
