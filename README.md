@@ -17,3 +17,10 @@
    - 核心组件安装与配置
    - 集群分发与初始化
    - 启动与 Web UI 验证
+
+3. [Hadoop + Spark + ZooKeeper 常见命令维护手册](Cluster_Maintenance_Commands.md)
+   - ZK 启停与状态查看
+   - HDFS 文件操作与 HA 高可用管理
+   - YARN 任务管理与启停
+   - Spark 任务提交与交互式开发
+   - 终极日志排错路径指南
