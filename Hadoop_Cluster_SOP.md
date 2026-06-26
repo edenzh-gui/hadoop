@@ -46,6 +46,12 @@ cat << 'EOF' >> /etc/hosts
 EOF
 ```
 
+> [!WARNING]
+> **Ubuntu 核心避坑指南 (重要！)**
+> 在 Ubuntu 系统下配置主机名时，`/etc/hosts` 顶部通常会自动生成一行 `127.0.1.1 spark0x` 的配置。
+> **请务必使用 `vim /etc/hosts` 将每台机器上绑定自己主机名的这一行 `127.0.1.1` 删除或注释掉**（保留 `127.0.0.1 localhost` 即可）。
+> 否则会导致 ZooKeeper、HDFS 等服务的端口错误绑定在内网回环地址上，造成外部访问时一直报 `Connection refused`！
+
 ### 2. 关闭防火墙
 Ubuntu 系统默认使用 `ufw`，需要将其关闭（注意：Ubuntu 默认没有预装 SELinux，无需配置 SELinux）：
 ```bash
